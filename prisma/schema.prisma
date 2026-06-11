@@ -1,0 +1,293 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RoleType {
+  SUPER_ADMIN
+  STORE_ADMIN
+  CUSTOMER
+}
+
+enum MutationType {
+  IN
+  OUT
+  TRANSFER
+}
+
+enum VoucherType {
+  PERCENTAGE
+  FIXED
+}
+
+enum OrderStatus {
+  WAITING_PAYMENT
+  WAITING_CONFIRMATION
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  name         String
+  email        String        @unique
+  password     String
+  role         RoleType      @default(CUSTOMER)
+  referralCode String?       @unique
+  referredBy   String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+  addresses    Address[]
+  carts        Cart[]
+  orders       Order[]
+  vouchers     UserVoucher[]
+  storeAdmins  StoreAdmin[]
+  referredUser User[]        @relation("Referral")
+  referrer     User?         @relation("Referral", fields: [referredBy], references: [id])
+}
+
+model Address {
+  id        String     @id @default(uuid())
+  userId    String
+  label     String
+  receiver  String
+  phone     String
+  address   String
+  province  String
+  city      String
+  district  String
+  latitude  Float
+  longitude Float
+  isPrimary Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  deletedAt DateTime?
+  user      User       @relation(fields: [userId], references: [id])
+  orders    Order[]
+  shippings Shipping[]
+}
+
+model Store {
+  id          String       @id @default(uuid())
+  name        String
+  address     String
+  latitude    Float
+  longitude   Float
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  admins      StoreAdmin[]
+  inventories Inventory[]
+  orders      Order[]
+  shippings   Shipping[]
+  cartItems   CartItem[]
+}
+
+model StoreAdmin {
+  id        String    @id @default(uuid())
+  storeId   String
+  userId    String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+  store     Store     @relation(fields: [storeId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([storeId, userId])
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  categoryId  String
+  name        String
+  slug        String      @unique
+  description String?
+  imageUrl    String?
+  price       Decimal     @db.Decimal(14, 2)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+  category    Category    @relation(fields: [categoryId], references: [id])
+  inventories Inventory[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+}
+
+model Inventory {
+  id        String          @id @default(uuid())
+  storeId   String
+  productId String
+  stock     Int
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  store     Store           @relation(fields: [storeId], references: [id])
+  product   Product         @relation(fields: [productId], references: [id])
+  mutations StockMutation[]
+
+  @@unique([storeId, productId])
+}
+
+model StockMutation {
+  id            String       @id @default(uuid())
+  inventoryId   String
+  type          MutationType
+  quantity      Int
+  referenceType String?
+  referenceId   String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  inventory     Inventory    @relation(fields: [inventoryId], references: [id])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id])
+  items     CartItem[]
+}
+
+model CartItem {
+  id            String  @id @default(uuid())
+  cartId        String
+  productId     String
+  storeId       String
+  quantity      Int
+  priceSnapshot Decimal @db.Decimal(14, 2)
+  cart          Cart    @relation(fields: [cartId], references: [id])
+  product       Product @relation(fields: [productId], references: [id])
+  store         Store   @relation(fields: [storeId], references: [id])
+
+  @@unique([cartId, productId, storeId])
+}
+
+model Voucher {
+  id           String        @id @default(uuid())
+  code         String        @unique
+  name         String
+  type         VoucherType
+  value        Decimal       @db.Decimal(14, 2)
+  minPurchase  Decimal?      @db.Decimal(14, 2)
+  startDate    DateTime
+  endDate      DateTime
+  totalQuota   Int?
+  usedQuota    Int           @default(0)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  userVouchers UserVoucher[]
+  orders       Order[]
+}
+
+//
+// USER VOUCHER
+//
+
+model UserVoucher {
+  id        String    @id @default(uuid())
+  userId    String
+  voucherId String
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+  voucher   Voucher   @relation(fields: [voucherId], references: [id])
+}
+
+//
+// ORDER
+//
+
+model Order {
+  id             String      @id @default(uuid())
+  userId         String
+  addressId      String
+  storeId        String
+  voucherId      String?
+  status         OrderStatus @default(WAITING_PAYMENT)
+  subtotal       Decimal     @db.Decimal(14, 2)
+  discountAmount Decimal     @default(0) @db.Decimal(14, 2)
+  shippingCost   Decimal     @db.Decimal(14, 2)
+  totalAmount    Decimal     @db.Decimal(14, 2)
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  user           User        @relation(fields: [userId], references: [id])
+  address        Address     @relation(fields: [addressId], references: [id])
+  store          Store       @relation(fields: [storeId], references: [id])
+  voucher        Voucher?    @relation(fields: [voucherId], references: [id])
+  items          OrderItem[]
+  payment        Payment?
+  shipping       Shipping?
+}
+
+model OrderItem {
+  id            String  @id @default(uuid())
+  orderId       String
+  productId     String
+  productName   String
+  priceSnapshot Decimal @db.Decimal(14, 2)
+  quantity      Int
+  subtotal      Decimal @db.Decimal(14, 2)
+  order         Order   @relation(fields: [orderId], references: [id])
+  product       Product @relation(fields: [productId], references: [id])
+}
+
+//
+// PAYMENT
+//
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String        @unique
+  amount        Decimal       @db.Decimal(14, 2)
+  bankName      String?
+  accountNumber String?
+  proofUrl      String
+  status        PaymentStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  order         Order         @relation(fields: [orderId], references: [id])
+}
+
+//
+// SHIPPING
+//
+
+model Shipping {
+  id                   String   @id @default(uuid())
+  orderId              String   @unique
+  courier              String
+  service              String
+  originStoreId        String
+  destinationAddressId String
+  shippingCost         Decimal  @db.Decimal(14, 2)
+  resi                 String?
+  status               String   @default("CALCULATED")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  order                Order    @relation(fields: [orderId], references: [id])
+  originStore          Store    @relation(fields: [originStoreId], references: [id])
+  destinationAddress   Address  @relation(fields: [destinationAddressId], references: [id])
+}
