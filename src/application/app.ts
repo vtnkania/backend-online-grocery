@@ -25,6 +25,36 @@ const app: Application = express();
 
 /*
 ─────────────────────────────────────────────────────────────
+Rate Limiter
+─────────────────────────────────────────────────────────────
+*/
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: StatusCodes.TOO_MANY_REQUESTS,
+    message: 'Too many requests, please try again later.',
+  },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: StatusCodes.TOO_MANY_REQUESTS,
+    message: 'Too many login attempts, please try again later.',
+  },
+});
+
+app.use(globalLimiter);
+
+
+/*
+─────────────────────────────────────────────────────────────
 Security Middleware
 ─────────────────────────────────────────────────────────────
 */
