@@ -15,10 +15,11 @@ import { errorMiddleware } from '@/middlewares/error.middleware';
 
 /*
 ─────────────────────────────────────────────────────────────
-Import Routers (uncomment & create as needed)
+Import Routers
 ─────────────────────────────────────────────────────────────
 */
-import { examplesRouter } from '@/features/examples/examples.router';
+// Contoh bawaan dihapus agar clean code, langsung import router alamatmu:
+import addressRouter from '@/features/addresses/addresses.router';
 
 const app: Application = express();
 
@@ -27,7 +28,6 @@ const app: Application = express();
 Security Middleware
 ─────────────────────────────────────────────────────────────
 */
-// Security Headers: Sets `X-Content-Type-Options`, `X-Frame-Options`, `HSTS`, etc.
 app.use(helmet());
 
 app.use(
@@ -44,52 +44,17 @@ app.use(
 Cookie Parser
 ─────────────────────────────────────────────────────────────
 */
-
 app.use(cookieParser());
 
 /*
 ─────────────────────────────────────────────────────────────
-Rate Limiter
+Standard Middleware
 ─────────────────────────────────────────────────────────────
 */
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: StatusCodes.TOO_MANY_REQUESTS,
-    message: 'Too many requests, please try again later.',
-  },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: StatusCodes.TOO_MANY_REQUESTS,
-    message: 'Too many login attempts, please try again later.',
-  },
-});
-
-app.use(globalLimiter);
-
-/*
-─────────────────────────────────────────────────────────────
-Request Parsing
-─────────────────────────────────────────────────────────────
-*/
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(compression());
 
-/*
-─────────────────────────────────────────────────────────────
-Logging
-─────────────────────────────────────────────────────────────
-*/
 if (NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
@@ -111,17 +76,17 @@ app.get('/health', (_req: Request, res: Response) => {
 
 /*
 ─────────────────────────────────────────────────────────────
-API Routes (uncomment & create as needed)
+API Routes
 ─────────────────────────────────────────────────────────────
 */
-app.use(`${API_PREFIX}/examples`, examplesRouter);
+// Daftarkan Route Fitur Alamat kamu (Feature 2)
+app.use(`${API_PREFIX}/addresses`, addressRouter);
 
-// Placeholder route — remove when real routes are registered
+// Placeholder route utama
 app.get(API_PREFIX, (_req: Request, res: Response) => {
   res.status(StatusCodes.OK).json({
-    message: 'Eventria-API is running 🎟️',
+    message: 'Online Grocery API is running 🛒',
     version: '1.0.0',
-    docs: `${API_PREFIX}/docs`,
   });
 });
 
