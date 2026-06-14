@@ -20,6 +20,8 @@ Import Routers
 */
 // Contoh bawaan dihapus agar clean code, langsung import router alamatmu:
 import addressRouter from '@/features/addresses/addresses.router';
+import authRouter from '@/features/auth/auth.router';
+import cartRouter from '@/features/carts/carts.routes';
 
 const app: Application = express();
 
@@ -110,7 +112,9 @@ API Routes
 ─────────────────────────────────────────────────────────────
 */
 // Daftarkan Route Fitur Alamat kamu (Feature 2)
+app.use(`${API_PREFIX}/auth`, authLimiter, authRouter);
 app.use(`${API_PREFIX}/addresses`, addressRouter);
+app.use(`${API_PREFIX}/carts`, cartRouter);
 
 // Placeholder route utama
 app.get(API_PREFIX, (_req: Request, res: Response) => {
