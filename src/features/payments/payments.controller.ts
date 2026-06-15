@@ -77,3 +77,24 @@ export const handleMidtransNotification = async (req: Request, res: Response): P
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const createQrisPayment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      res.status(400).json({ success: false, message: "orderId wajib dikirim!" });
+      return;
+    }
+
+    const result = await paymentService.createMidtransQrisService(orderId);
+
+    res.status(200).json({
+      success: true,
+      message: "Berhasil membuat QR Code pembayaran Midtrans!",
+      data: result
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
