@@ -34,6 +34,11 @@ export const createAddressService = async (userId: string, data: {
   receiverName: string;
   phoneNumber: string;
   addressDetails: string;
+  province: string;
+  city: string;
+  district: string;
+  latitude: number;
+  longitude: number;
   isPrimary?: boolean;
 }) => {
   if (data.isPrimary) {
@@ -57,12 +62,11 @@ export const createAddressService = async (userId: string, data: {
       phone: data.phoneNumber,
       address: data.addressDetails,
       isPrimary: shouldBePrimary,
-      // Isian default agar validasi skema Prisma terlewati dengan sukses
-      province: "Banten",
-      city: "Tangerang",
-      district: "Cipondoh",
-      latitude: -6.199,
-      longitude: 106.664
+      province: data.province,     // Menerima input dinamis
+      city: data.city,             // Menerima input dinamis
+      district: data.district,     // Menerima input dinamis
+      latitude: Number(data.latitude),   // Menjamin tipe data Float untuk hitungan jarak
+      longitude: Number(data.longitude)  // Menjamin tipe data Float untuk hitungan jarak
     },
   });
 };

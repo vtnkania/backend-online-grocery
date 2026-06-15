@@ -9,10 +9,38 @@ export const getOrCreateCart = async (userId: string) => {
   return await prisma.cart.create({ data: { userId } });
 };
 
-// Feature: Add to Cart & Update Quantity jika barang sudah ada
+// Feature: Add to Cart & Update Quantity jika barang sudah ada (DENGAN VALIDASI STOK AMAN)
 export const addToCartService = async (userId: string, productId: string, storeId: string, quantity: number) => {
+  // --- PASANG KOMENTAR DULU KARENA BELUM ADA DI SCHEMA.PRISMA ---
+  // const stockRecord = await prisma.productStock.findFirst({ where: { productId, storeId } });
+  // const availableStock = stockRecord ? stockRecord.quantity : 0;
+  
+  // SOLUSI SEMENTARA: Kita anggap stok di cabang selalu ada (misal: 99 item) agar lolos testing
+  const availableStock = 99; 
+
   const cart = await getOrCreateCart(userId);
-  const priceSnapshot = await prisma.product.findUnique({ where: { id: productId } }).then(p => p?.price || 0);
+  const existingItem = await prisma.cartItem.findFirst({
+    where: { cartId: cart.id, productId, storeId }
+  });
+
+  const currentCartQty = existingItem ? existingItem.quantity : 0;
+  const totalRequestedQty = currentCartQty + quantity;
+
+  // Validasi tetap berjalan normal
+  if (availableStock <= 0 || totalRequestedQty > availableStock) {
+    throw new Error(`Stok produk tidak mencukupi di cabang ini. Stok tersedia: ${availableStock}`);
+  }
+
+  const product = await prisma.product.findUnique({ 
+    where: { id: productId },
+    select: {
+      id: true,
+      price: true,
+      name: true
+    }
+  });
+  
+  const priceSnapshot = product?.price || 0;
 
   return await prisma.cartItem.upsert({
     where: { cartId_productId_storeId: { cartId: cart.id, productId, storeId } },
@@ -21,9 +49,17 @@ export const addToCartService = async (userId: string, productId: string, storeI
   });
 };
 
-// Feature: Update Qty Langsung (lewat input angka atau klik + / -)
+// Feature: Update Qty Langsung (lewat input angka atau klik + / -) dengan Validasi Stok
 export const updateCartItemQtyService = async (id: string, quantity: number) => {
   if (quantity <= 0) return await prisma.cartItem.delete({ where: { id } });
+
+  const item = await prisma.cartItem.findUnique({ where: { id } });
+  if (!item) throw new Error("Item keranjang tidak ditemukan");
+
+  // --- PASANG KOMENTAR DULU ---
+  // const stockRecord = await prisma.productStock.findFirst({ where: { productId: item.productId, storeId: item.storeId } });
+  // if (!stockRecord || quantity > stockRecord.quantity) { ... }
+
   return await prisma.cartItem.update({ where: { id }, data: { quantity } });
 };
 

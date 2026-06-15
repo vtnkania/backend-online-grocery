@@ -15,13 +15,23 @@ export const getUserAddresses = async (req: Request, res: Response): Promise<voi
 
 export const createAddress = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Masih menggunakan hardcode userId yang sama dengan kemarin untuk keperluan test
-    const userId = "c2ab071d-03b2-4343-a842-210d4e208d89"; 
-    const { addressName, receiverName, phoneNumber, addressDetails, isPrimary } = req.body;
+    const userId = "c2ab071d-03b2-4343-a842-210d4e208d89"; // User ID simulasi testing
+    const { 
+      addressName, 
+      receiverName, 
+      phoneNumber, 
+      addressDetails, 
+      province, 
+      city, 
+      district, 
+      latitude, 
+      longitude, 
+      isPrimary 
+    } = req.body;
 
-    // Validasi input standar
-    if (!addressName || !receiverName || !phoneNumber || !addressDetails) {
-      res.status(400).json({ message: "Semua kolom input wajib diisi!" });
+    // Validasi parameter wajib (termasuk koordinat demi keamanan Biteship)
+    if (!addressName || !receiverName || !phoneNumber || !addressDetails || latitude === undefined || longitude === undefined) {
+      res.status(400).json({ message: "Semua kolom input termasuk koordinat GPS wajib diisi!" });
       return;
     }
 
@@ -30,11 +40,16 @@ export const createAddress = async (req: Request, res: Response): Promise<void> 
       receiverName,
       phoneNumber,
       addressDetails,
+      province: province || "DKI Jakarta",
+      city: city || "Jakarta Pusat",
+      district: district || "Gambir",
+      latitude: Number(latitude),
+      longitude: Number(longitude),
       isPrimary
     });
 
     res.status(201).json({
-      message: "Alamat baru berhasil ditambahkan!",
+      message: "Alamat baru dinamis berhasil ditambahkan!",
       data: newAddress
     });
   } catch (error: any) {

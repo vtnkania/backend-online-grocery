@@ -12,14 +12,11 @@ import {
   NODE_ENV,
 } from '../configs/dotenv.config';
 import { errorMiddleware } from '@/middlewares/error.middleware';
-
-/*
-─────────────────────────────────────────────────────────────
-Import Routers
-─────────────────────────────────────────────────────────────
-*/
-// Contoh bawaan dihapus agar clean code, langsung import router alamatmu:
 import addressRouter from '@/features/addresses/addresses.router';
+import cartRouter from '@/features/carts/carts.routes';
+import shippingRouter from '@/features/shippings/shippings.routes';
+import orderRouter from '../features/orders/orders.routes';
+import paymentRouter from '../features/payments/payments.routes';
 
 const app: Application = express();
 
@@ -111,6 +108,15 @@ API Routes
 */
 // Daftarkan Route Fitur Alamat kamu (Feature 2)
 app.use(`${API_PREFIX}/addresses`, addressRouter);
+
+// Daftarkan Route Fitur Keranjang kamu (Feature 3)
+app.use(`${API_PREFIX}/carts`, cartRouter);
+
+app.use(`${API_PREFIX}/shippings`, shippingRouter);
+
+app.use(`${API_PREFIX}/orders`, orderRouter);
+
+app.use(`${API_PREFIX}/payments`, paymentRouter);
 
 // Placeholder route utama
 app.get(API_PREFIX, (_req: Request, res: Response) => {

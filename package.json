@@ -16,6 +16,7 @@
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^6.19.3",
     "@types/multer": "^2.0.0",
+    "axios": "^1.17.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.10.0",
     "compression": "^1.8.1",
@@ -54,7 +55,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3"
   },
-
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   }
