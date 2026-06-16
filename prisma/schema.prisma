@@ -3,61 +3,50 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-enum RoleType {
-  SUPER_ADMIN
-  STORE_ADMIN
-  CUSTOMER
-}
-
-enum MutationType {
-  IN
-  OUT
-  TRANSFER
-}
-
-enum VoucherType {
-  PERCENTAGE
-  FIXED
-}
-
-enum OrderStatus {
-  WAITING_PAYMENT
-  WAITING_CONFIRMATION
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-}
-
-enum PaymentStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 model User {
-  id           String        @id @default(uuid())
-  name         String
-  email        String        @unique
-  password     String
-  role         RoleType      @default(CUSTOMER)
-  referralCode String?       @unique
-  referredBy   String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  deletedAt    DateTime?
-  addresses    Address[]
-  carts        Cart[]
-  orders       Order[]
-  vouchers     UserVoucher[]
-  storeAdmins  StoreAdmin[]
-  referredUser User[]        @relation("Referral")
-  referrer     User?         @relation("Referral", fields: [referredBy], references: [id])
+  id              String              @id @default(uuid())
+  name            String?
+  email           String              @unique
+  password        String?
+  role            RoleType            @default(CUSTOMER)
+  referralCode    String?             @unique
+  referredBy      String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+  authProvider    AuthProvider        @default(EMAIL)
+  emailVerifiedAt DateTime?
+  isVerified      Boolean             @default(false)
+  pendingEmail    String?             @unique
+  profileImageUrl String?
+  addresses       Address[]
+  carts           Cart[]
+  orders          Order[]
+  socialAccounts  SocialAccount[]
+  storeAdmins     StoreAdmin[]
+  referrer        User?               @relation("Referral", fields: [referredBy], references: [id])
+  referredUser    User[]              @relation("Referral")
+  vouchers        UserVoucher[]
+  tokens          VerificationToken[]
+}
+
+model VerificationToken {
+  id        String                @id @default(uuid())
+  userId    String
+  tokenHash String                @unique
+  type      VerificationTokenType
+  expiresAt DateTime
+  usedAt    DateTime?
+  newEmail  String?
+  createdAt DateTime              @default(now())
+  user      User                  @relation(fields: [userId], references: [id])
+
+  @@index([userId, type])
 }
 
 model Address {
@@ -89,11 +78,11 @@ model Store {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
-  admins      StoreAdmin[]
+  cartItems   CartItem[]
   inventories Inventory[]
   orders      Order[]
   shippings   Shipping[]
-  cartItems   CartItem[]
+  admins      StoreAdmin[]
 }
 
 model StoreAdmin {
@@ -111,35 +100,35 @@ model StoreAdmin {
 model Category {
   id        String    @id @default(uuid())
   name      String    @unique
-  imageUrl  String?
   createdAt DateTime  @default(now())
+  imageUrl  String?
   products  Product[]
 }
 
 model Product {
-  id          String      @id @default(uuid())
-  categoryId  String
-  name        String
-  slug        String      @unique
-  description String?
-  productImages  ProductImage[]
-  price       Decimal     @db.Decimal(14, 2)
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  deletedAt   DateTime?
-  category    Category    @relation(fields: [categoryId], references: [id])
-  inventories Inventory[]
-  cartItems   CartItem[]
-  orderItems  OrderItem[]
+  id            String         @id @default(uuid())
+  categoryId    String
+  name          String
+  slug          String         @unique
+  description   String?
+  price         Decimal        @db.Decimal(14, 2)
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  cartItems     CartItem[]
+  inventories   Inventory[]
+  orderItems    OrderItem[]
+  category      Category       @relation(fields: [categoryId], references: [id])
+  productImages ProductImage[]
 }
 
 model ProductImage {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   productId String
   url       String
-  createdAt DateTime  @default(now())
-  product   Product   @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
 }
 
 model Inventory {
@@ -149,8 +138,8 @@ model Inventory {
   stock     Int
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-  store     Store           @relation(fields: [storeId], references: [id])
   product   Product         @relation(fields: [productId], references: [id])
+  store     Store           @relation(fields: [storeId], references: [id])
   mutations StockMutation[]
 
   @@unique([storeId, productId])
@@ -204,8 +193,8 @@ model Voucher {
   isActive     Boolean       @default(true)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  userVouchers UserVoucher[]
   orders       Order[]
+  userVouchers UserVoucher[]
 }
 
 model UserVoucher {
@@ -218,10 +207,6 @@ model UserVoucher {
   user      User      @relation(fields: [userId], references: [id])
   voucher   Voucher   @relation(fields: [voucherId], references: [id])
 }
-
-//
-// ORDER
-//
 
 model Order {
   id             String      @id @default(uuid())
@@ -237,9 +222,9 @@ model Order {
   notes          String?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
-  user           User        @relation(fields: [userId], references: [id])
   address        Address     @relation(fields: [addressId], references: [id])
   store          Store       @relation(fields: [storeId], references: [id])
+  user           User        @relation(fields: [userId], references: [id])
   voucher        Voucher?    @relation(fields: [voucherId], references: [id])
   items          OrderItem[]
   payment        Payment?
@@ -258,10 +243,6 @@ model OrderItem {
   product       Product @relation(fields: [productId], references: [id])
 }
 
-//
-// PAYMENT
-//
-
 model Payment {
   id            String        @id @default(uuid())
   orderId       String        @unique
@@ -276,10 +257,6 @@ model Payment {
   order         Order         @relation(fields: [orderId], references: [id])
 }
 
-//
-// SHIPPING
-//
-
 model Shipping {
   id                   String   @id @default(uuid())
   orderId              String   @unique
@@ -292,7 +269,67 @@ model Shipping {
   status               String   @default("CALCULATED")
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  destinationAddress   Address  @relation(fields: [destinationAddressId], references: [id])
   order                Order    @relation(fields: [orderId], references: [id])
   originStore          Store    @relation(fields: [originStoreId], references: [id])
-  destinationAddress   Address  @relation(fields: [destinationAddressId], references: [id])
+}
+
+model SocialAccount {
+  id             String       @id @default(uuid())
+  userId         String
+  provider       AuthProvider
+  providerUserId String
+  email          String
+  avatarUrl      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerUserId])
+  @@unique([userId, provider])
+  @@index([email])
+}
+
+enum RoleType {
+  SUPER_ADMIN
+  STORE_ADMIN
+  CUSTOMER
+}
+
+enum MutationType {
+  IN
+  OUT
+  TRANSFER
+}
+
+enum VoucherType {
+  PERCENTAGE
+  FIXED
+}
+
+enum OrderStatus {
+  WAITING_PAYMENT
+  WAITING_CONFIRMATION
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  GITHUB
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFICATION
+  RESET_PASSWORD
+  EMAIL_CHANGE
 }

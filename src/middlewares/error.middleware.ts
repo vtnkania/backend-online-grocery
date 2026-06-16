@@ -3,6 +3,7 @@ import { ResponseError } from '@/error/response.error';
 import { logger } from '@/application/logging';
 import { StatusCodes } from 'http-status-codes';
 import { ZodError } from 'zod';
+import multer from 'multer';
 
 const handleResponseError = (error: ResponseError, res: Response): void => {
   // Expected business logic error thrown with an explicit HTTP status code.
@@ -28,6 +29,11 @@ const handleUnknownError = (error: Error, res: Response): void => {
     .json({ status: 'error', message: 'Internal server error' });
 };
 
+const handleMulterError = (error: multer.MulterError, res: Response): void => {
+  const message = error.code === 'LIMIT_FILE_SIZE' ? 'File size must be 1MB or less.' : error.message;
+  res.status(StatusCodes.BAD_REQUEST).json({ status: 'error', message });
+};
+
 export const errorMiddleware = (
   error: Error,
   _: Request,
@@ -36,5 +42,6 @@ export const errorMiddleware = (
 ) => {
   if (error instanceof ResponseError) return handleResponseError(error, res);
   if (error instanceof ZodError) return handleZodError(error, res);
+  if (error instanceof multer.MulterError) return handleMulterError(error, res);
   handleUnknownError(error, res);
 };
