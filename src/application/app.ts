@@ -18,6 +18,9 @@ import shippingRouter from '@/features/shippings/shippings.routes';
 import orderRouter from '../features/orders/orders.routes';
 import paymentRouter from '../features/payments/payments.routes';
 import authRouter from '@/features/auth/auth.router';
+import catalogRouter from '@/features/catalog/catalog.routes';
+import adminProductRouter from '@/features/admin-products/admin-products.routes';
+import adminInventoryRouter from '@/features/admin-inventories/admin-inventories.routes';
 
 const app: Application = express();
 
@@ -120,6 +123,11 @@ app.use(`${API_PREFIX}/shippings`, shippingRouter);
 app.use(`${API_PREFIX}/orders`, orderRouter);
 
 app.use(`${API_PREFIX}/payments`, paymentRouter);
+
+app.use(`${API_PREFIX}/admin/products`, adminProductRouter);
+app.use(`${API_PREFIX}/admin/inventories`, adminInventoryRouter);
+
+app.use(API_PREFIX, catalogRouter);
 
 // Placeholder route utama
 app.get(API_PREFIX, (_req: Request, res: Response) => {
