@@ -18,7 +18,6 @@ import shippingRouter from '@/features/shippings/shippings.routes';
 import orderRouter from '../features/orders/orders.routes';
 import paymentRouter from '../features/payments/payments.routes';
 import authRouter from '@/features/auth/auth.router';
-import cartRouter from '@/features/carts/carts.routes';
 
 const app: Application = express();
 
