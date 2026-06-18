@@ -9,15 +9,18 @@ interface CreateOrderInput {
   shippingCost: number;
 }
 
+// Feature Customer: Membuat Pesanan Baru Berdasarkan Isi Keranjang Belanja (100% Dinamis)
 export const createOrderService = async (data: CreateOrderInput) => {
-  // 1. Ambil data keranjang user beserta item-item di dalamnya
+  // 1. Ambil data keranjang user beserta item-item di dalamnya lengkap dengan gambar asli
   const userCart = await prisma.cart.findFirst({
     where: { userId: data.userId },
     include: { 
       items: { 
         include: { 
           product: {
-            select: { name: true }
+            include: {
+              productImages: true // 👈 Menyertakan relasi gambar Cloudinary yang sukses kita perbaiki
+            }
           } 
         } 
       } 
@@ -47,40 +50,37 @@ export const createOrderService = async (data: CreateOrderInput) => {
   // 3. Hitung total harga produk murni (SUB TOTAL)
   let totalProductPrice = 0;
   userCart.items.forEach((item) => {
-    totalProductPrice += Number(item.priceSnapshot) * item.quantity;
+    const currentPrice = Number(item.priceSnapshot) || Number(item.product.price);
+    totalProductPrice += currentPrice * item.quantity;
   });
 
   // 4. Hitung Grand Total (Subtotal + Ongkir)
   const grandTotal = totalProductPrice + Number(data.shippingCost);
 
-  // 5. Jalankan Database Transaction secara mandiri
+  // 5. Jalankan Database Transaction secara aman
   return await prisma.$transaction(async (tx) => {
     
-    // Suplai data finansial + Operator Connect User, Address, dan Store demi meloloskan validasi database!
-    const coreOrderData: any = {
-      user: {
-        connect: { id: data.userId }
-      },
-      address: {
-        connect: { id: primaryAddress.id }
-      },
-      store: {
-        connect: { id: targetStoreId }
-      },
-      subtotal: new Prisma.Decimal(totalProductPrice),
-      shippingCost: new Prisma.Decimal(data.shippingCost),
-      totalAmount: new Prisma.Decimal(grandTotal)
-    };
-
-    // A. Buat data induk Order terlebih dahulu
+    // A. Buat data induk Order terlebih dahulu (Sesuai skema relasi database asli timmu)
     const newOrder = await tx.order.create({
-      data: coreOrderData
+      data: {
+        user: {
+          connect: { id: data.userId }
+        },
+        address: {
+          connect: { id: primaryAddress.id }
+        },
+        store: {
+          connect: { id: targetStoreId }
+        },
+        subtotal: new Prisma.Decimal(totalProductPrice),
+        shippingCost: new Prisma.Decimal(data.shippingCost),
+        totalAmount: new Prisma.Decimal(grandTotal)
+      }
     });
 
-    // B. Buat data Shipping terpisah (DENGAN CONNECT ORDER RESMI!)
+    // B. Buat data Shipping terpisah (Menggunakan data kurir dari frontend)
     await tx.shipping.create({
       data: {
-        // KUNCI UTAMA: Hubungkan secara resmi menggunakan properti objek 'order' lewat connect!
         order: {
           connect: { id: newOrder.id }
         },
@@ -93,11 +93,11 @@ export const createOrderService = async (data: CreateOrderInput) => {
         destinationAddress: {
           connect: { id: primaryAddress.id }
         }
-      } as any
+      }
     });
 
-    // C. Buat semua data OrderItem secara terpisah
-    const orderItemsData = userCart.items.map((item: any) => {
+    // C. Persiapkan item data untuk dipindahkan ke tabel OrderItem
+    const orderItemsData = userCart.items.map((item) => {
       const itemPrice = Number(item.priceSnapshot);
       const itemSubtotal = itemPrice * item.quantity;
       
@@ -121,13 +121,13 @@ export const createOrderService = async (data: CreateOrderInput) => {
       where: { cartId: userCart.id }
     });
 
-    // Ambil data order lengkap beserta relasinya untuk dikembalikan ke Postman
+    // Ambil data order lengkap beserta relasinya untuk dilempar balik ke frontend
     return await tx.order.findUnique({
       where: { id: newOrder.id },
       include: { items: true, shipping: true }
     });
   }, {
-    timeout: 20000 // <--- SELIPKAN DI SINI, BAGUS!
+    timeout: 20000
   });
 };
 
@@ -140,18 +140,17 @@ export const getUserOrdersHistoryService = async (userId: string) => {
   return await prisma.order.findMany({
     where: { userId },
     include: {
-      items: true,    // Sertakan daftar barang yang dibeli
-      shipping: true, // Sertakan status pengiriman kurir
+      items: true,    
+      shipping: true, 
     },
     orderBy: {
-      createdAt: 'desc' // Urutkan dari pesanan yang paling terbaru
+      createdAt: 'desc' 
     }
   });
 };
 
 // Feature Customer: Mengonfirmasi bahwa barang telah sampai di tangan pembeli
 export const completeOrderService = async (orderId: string) => {
-  // 1. Cek apakah data ordernya eksis
   const existingOrder = await prisma.order.findUnique({
     where: { id: orderId }
   });
@@ -164,7 +163,6 @@ export const completeOrderService = async (orderId: string) => {
     throw new Error("Pesanan tidak dapat diselesaikan karena statusnya belum dikirim kurir!");
   }
 
-  // 2. Update status Order langsung menjadi DELIVERED sesuai enum OrderStatus Kania
   return await prisma.order.update({
     where: { id: orderId },
     data: {
@@ -173,9 +171,8 @@ export const completeOrderService = async (orderId: string) => {
   });
 };
 
-// Feature Customer: Membalkan pesanan secara mandiri (Hanya jika belum bayar!)
+// Feature Customer: Membatalkan pesanan secara mandiri (Hanya jika belum bayar!)
 export const cancelOrderService = async (orderId: string) => {
-  // 1. Cek apakah data ordernya eksis
   const existingOrder = await prisma.order.findUnique({
     where: { id: orderId }
   });
@@ -184,12 +181,10 @@ export const cancelOrderService = async (orderId: string) => {
     throw new Error("Data pesanan (Order) tidak ditemukan!");
   }
 
-  // 2. Validasi bisnis: Jangan sampai admin rugi karena user nge-cancel pesanan yang sudah diproses/dikirim!
   if (existingOrder.status !== "WAITING_PAYMENT") {
     throw new Error("Pesanan tidak dapat dibatalkan karena pembayaran telah diverifikasi atau barang sedang diproses!");
   }
 
-  // 3. Update status Order langsung menjadi CANCELLED sesuai enum OrderStatus Kania
   return await prisma.order.update({
     where: { id: orderId },
     data: {

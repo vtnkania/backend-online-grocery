@@ -1,10 +1,16 @@
 import { Request, Response } from 'express';
 import * as addressService from './addresses.service';
 
+// 1. Ambil Semua Alamat Berdasarkan Query/Body userId (BACKEND)
 export const getUserAddresses = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Ganti string di bawah ini dengan UUID milik Bagus Test dari Prisma Studio kamu
-    const userId = "c2ab071d-03b2-4343-a842-210d4e208d89";
+    // Membaca userId secara dinamis dari query string (misal: /addresses?userId=...)
+    const userId = (req.query.userId || req.body.userId) as string;
+
+    if (!userId) {
+      res.status(400).json({ message: "Parameter userId wajib disertakan!" });
+      return;
+    }
     
     const result = await addressService.getUserAddressesService(userId);
     res.status(200).json({ data: result });
@@ -13,10 +19,11 @@ export const getUserAddresses = async (req: Request, res: Response): Promise<voi
   }
 };
 
+// 2. Tambah Alamat Baru Dinamis
 export const createAddress = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = "c2ab071d-03b2-4343-a842-210d4e208d89"; // User ID simulasi testing
     const { 
+      userId, 
       addressName, 
       receiverName, 
       phoneNumber, 
@@ -29,9 +36,9 @@ export const createAddress = async (req: Request, res: Response): Promise<void> 
       isPrimary 
     } = req.body;
 
-    // Validasi parameter wajib (termasuk koordinat demi keamanan Biteship)
-    if (!addressName || !receiverName || !phoneNumber || !addressDetails || latitude === undefined || longitude === undefined) {
-      res.status(400).json({ message: "Semua kolom input termasuk koordinat GPS wajib diisi!" });
+    // Validasi parameter wajib sebelum eksekusi ke DB
+    if (!userId || !addressName || !receiverName || !phoneNumber || !addressDetails || latitude === undefined || longitude === undefined) {
+      res.status(400).json({ message: "Semua kolom input termasuk userId dan koordinat GPS wajib diisi!" });
       return;
     }
 
@@ -57,15 +64,17 @@ export const createAddress = async (req: Request, res: Response): Promise<void> 
   }
 };
 
+// 3. Perbarui Detail Alamat Dinamis
 export const updateAddress = async (req: Request, res: Response): Promise<void> => {
   try {
     const addressId = req.params.id as string;
-    const userId = "c2ab071d-03b2-4343-a842-210d4e208d89"; 
-    
-    // Tangkap kiriman dari form frontend
-    const { addressName, receiverName, phoneNumber, addressDetails, isPrimary } = req.body;
+    const { userId, addressName, receiverName, phoneNumber, addressDetails, isPrimary } = req.body;
 
-    // Petakan ke nama parameter yang dibaca oleh updateAddressService Prisma kalian
+    if (!userId) {
+      res.status(400).json({ message: "userId wajib disertakan untuk melakukan update!" });
+      return;
+    }
+
     const updatedAddress = await addressService.updateAddressService(addressId, userId, {
       label: addressName,
       receiver: receiverName,
@@ -79,16 +88,21 @@ export const updateAddress = async (req: Request, res: Response): Promise<void> 
       data: updatedAddress
     });
   } catch (error: any) {
-    console.error("Eror detail di backend:", error); // Biar kelihatan di terminal backend jika ada eror lain
+    console.error("Eror detail di backend:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
+// 4. Hapus Alamat Dinamis
 export const deleteAddress = async (req: Request, res: Response): Promise<void> => {
   try {
     const addressId = req.params.id as string;
-    // Gunakan userId dummy yang sama dengan fungsi sebelumnya
-    const userId = "c2ab071d-03b2-4343-a842-210d4e208d89"; 
+    const userId = (req.query.userId || req.body.userId) as string;
+
+    if (!userId) {
+      res.status(400).json({ message: "userId wajib disertakan untuk menghapus alamat!" });
+      return;
+    }
 
     await addressService.deleteAddressService(addressId, userId);
 
