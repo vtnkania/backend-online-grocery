@@ -68,10 +68,21 @@ export const deleteCartItemService = async (id: string) => {
   return await prisma.cartItem.delete({ where: { id } });
 };
 
-// Feature: Get Cart Data untuk List Tampilan User
+/// Feature: Get Cart Data untuk List Tampilan User (100% DINAMIS REAL-TIME)
 export const getUserCartService = async (userId: string) => {
   return await prisma.cart.findFirst({
     where: { userId },
-    include: { items: { include: { product: true, store: true } } }
+    include: {
+      items: {
+        include: {
+          store: true,
+          product: {
+            include: {
+              productImages: true,
+            }
+          }
+        }
+      }
+    }
   });
 };

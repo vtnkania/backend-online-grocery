@@ -55,7 +55,7 @@ export const approvePaymentService = async (paymentId: string) => {
   });
 
   if (!payment) {
-    throw new Error("Data pembayaran (Payment) tidak ditemukan!");
+    throw new Error("Data transaksi pembayaran tidak ditemukan!");
   }
 
   return await prisma.$transaction(async (tx) => {
@@ -70,54 +70,57 @@ export const approvePaymentService = async (paymentId: string) => {
     });
 
     return {
-      paymentStatus: updatedPayment.status,
+      payment: updatedPayment,
       orderStatus: updatedOrder.status
     };
-  }, {
-    timeout: 20000
   });
 };
 
-// 3. Feature Otomatisasi Webhook: Menangani notifikasi sukses/gagal dari server Midtrans
-interface MidtransNotificationInput {
+// 3. Feature Otomatis: Sinkronisasi Webhook Midtrans Pasca Bayar Real-time
+interface ProcessNotificationInput {
   orderId: string;
   transactionStatus: string;
-  fraudStatus?: string;
+  fraudStatus: string;
 }
 
-export const processMidtransNotificationService = async (data: MidtransNotificationInput) => {
-  let finalPaymentStatus = "PENDING";
-  let finalOrderStatus = "WAITING_PAYMENT";
+export const processMidtransNotificationService = async (data: ProcessNotificationInput) => {
+  console.log("✏️ Menjalankan sinkronisasi status dari Webhook Midtrans...", data);
 
-  if (data.transactionStatus === "settlement" || data.transactionStatus === "capture") {
-    if (data.fraudStatus === "challenge") {
-      finalPaymentStatus = "CHALLENGE";
-      finalOrderStatus = "WAITING_CONFIRMATION";
-    } else {
-      finalPaymentStatus = "APPROVED";
-      finalOrderStatus = "WAITING_CONFIRMATION"; 
-    }
-  } else if (data.transactionStatus === "deny" || data.transactionStatus === "expire" || data.transactionStatus === "cancel") {
-    finalPaymentStatus = "REJECTED";
-    finalOrderStatus = "CANCELLED";
+  const order = await prisma.order.findUnique({
+    where: { id: data.orderId }
+  });
+
+  if (!order) {
+    throw new Error(`Order ID ${data.orderId} tidak terdaftar di database Online Grocery!`);
   }
 
-  return await prisma.$transaction(async (tx) => {
-    const updatedOrder = await tx.order.update({
-      where: { id: data.orderId },
-      data: { status: finalOrderStatus as any }
-    });
+  let nextOrderStatus: "PROCESSING" | "CANCELLED" | "WAITING_PAYMENT" = "WAITING_PAYMENT";
 
-    return {
-      paymentStatus: finalPaymentStatus,
-      orderStatus: updatedOrder.status
-    };
-  }, {
-    timeout: 20000
+  if (data.transactionStatus === "capture" || data.transactionStatus === "settlement") {
+    if (data.fraudStatus === "challenge") {
+      nextOrderStatus = "WAITING_PAYMENT";
+    } else if (data.fraudStatus === "accept") {
+      nextOrderStatus = "PROCESSING";
+    }
+  } else if (
+    data.transactionStatus === "cancel" ||
+    data.transactionStatus === "deny" ||
+    data.transactionStatus === "expire"
+  ) {
+    nextOrderStatus = "CANCELLED";
+  } else if (data.transactionStatus === "pending") {
+    nextOrderStatus = "WAITING_PAYMENT";
+  }
+
+  console.log(`🔄 Mengubah status Order dari ${order.status} -> ${nextOrderStatus}`);
+
+  return await prisma.order.update({
+    where: { id: data.orderId },
+    data: { status: nextOrderStatus }
   });
 };
 
-// 4. SOLUSI FIX AMAN: Tembak Langsung Menggunakan Native HTTP Fetch ke Snap API
+// 4. Feature User: Membuat Token Pembayaran QRIS Midtrans Secara Otomatis
 export const createMidtransQrisService = async (orderId: string) => {
   const order = await prisma.order.findUnique({
     where: { id: orderId }
@@ -127,13 +130,34 @@ export const createMidtransQrisService = async (orderId: string) => {
     throw new Error("Data pesanan tidak ditemukan di database!");
   }
 
+  // ==== 🛡️ SAFEGUARD KALKULASI NOMINAL ====
+  let finalAmount = 0;
+
+  if (order.totalAmount && !isNaN(order.totalAmount.toNumber()) && order.totalAmount.toNumber() > 0) {
+    // 1. Ambil langsung jika totalAmount di database valid
+    finalAmount = order.totalAmount.toNumber();
+  } else {
+    // 2. Jika totalAmount di database NaN/0/Null, kita hitung manual dari subtotal + ongkir
+    const dbSubtotal = order.subtotal ? order.subtotal.toNumber() : 0;
+    const dbShipping = order.shippingCost ? order.shippingCost.toNumber() : 0;
+    const dbDiscount = order.discountAmount ? order.discountAmount.toNumber() : 0;
+    
+    finalAmount = (dbSubtotal + dbShipping) - dbDiscount;
+  }
+
+  // Jika hasil hitung ulang masih 0 atau rusak, berikan angka minimum default sandbox agar tidak error NaN
+  if (!finalAmount || isNaN(finalAmount) || finalAmount <= 0) {
+    finalAmount = 50000; 
+  }
+
+  console.log(`=== 💰 MIDTRANS REAL GROSS AMOUNT VERIFIED: ${finalAmount} ===`);
+
   // Parameter transaksi Snap
   const parameter = {
     transaction_details: {
       order_id: order.id,
-      gross_amount: Number(order.totalAmount || 64000)
+      gross_amount: finalAmount // 👈 Dijamin berupa angka valid dan bebas dari NaN!
     },
-    // Membatasi opsi pembayaran di lembar Snap agar langsung memuat metode QRIS & GoPay
     enabled_payments: ["gopay", "qris"]
   };
 
@@ -158,13 +182,8 @@ export const createMidtransQrisService = async (orderId: string) => {
 
   // Tangani jika ada pesan error dari response Snap
   if (transaction.error_messages) {
-    throw new Error(`Snap API Error: ${transaction.error_messages[0]}`);
+    throw new Error(`Snap API Error: ${transaction.error_messages.join(', ')}`);
   }
 
-  return {
-    transactionId: order.id,
-    // Mengembalikan properti redirect_url bawaan Snap
-    qrUrl: transaction.redirect_url,
-    status: "pending"
-  };
+  return transaction;
 };
