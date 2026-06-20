@@ -24,6 +24,8 @@ import adminInventoryRouter from '@/features/admin-inventories/admin-inventories
 import adminStockMutationRouter from '@/features/admin-stock-mutations/admin-stock-mutations.routes';
 import adminCategoryRouter from '@/features/admin-categories/admin-categories.routes';
 import adminStoreRouter from '@/features/admin-stores/admin-stores.routes';
+import adminUserRouter from '@/features/admin-users/admin-users.routes';
+import adminDashboardRouter from '@/features/admin-dashboard/admin-dashboard.routes';
 
 const app: Application = express();
 
@@ -132,6 +134,8 @@ app.use(`${API_PREFIX}/admin/inventories`, adminInventoryRouter);
 app.use(`${API_PREFIX}/admin/stock-mutations`, adminStockMutationRouter);
 app.use(`${API_PREFIX}/admin/categories`, adminCategoryRouter);
 app.use(`${API_PREFIX}/admin/stores`, adminStoreRouter);
+app.use(`${API_PREFIX}/admin/users`, adminUserRouter);
+app.use(`${API_PREFIX}/admin/dashboard`, adminDashboardRouter);
 
 app.use(API_PREFIX, catalogRouter);
 

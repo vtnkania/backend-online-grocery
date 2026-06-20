@@ -2,7 +2,10 @@ import 'dotenv/config';
 
 export const PORT = Number(process.env.PORT) || 3000;
 export const NODE_ENV = process.env.NODE_ENV ?? 'development';
-export const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') ?? '*';
+const localOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
+export const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? Array.from(new Set([...process.env.ALLOWED_ORIGINS.split(','), ...localOrigins]))
+  : '*';
 export const API_PREFIX = '/api/v1';
 
 // DAFTARKAN DUA VARIABEL EXPORT BARU INI UNTUK MIDTRANS
