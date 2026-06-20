@@ -21,6 +21,9 @@ import authRouter from '@/features/auth/auth.router';
 import catalogRouter from '@/features/catalog/catalog.routes';
 import adminProductRouter from '@/features/admin-products/admin-products.routes';
 import adminInventoryRouter from '@/features/admin-inventories/admin-inventories.routes';
+import adminStockMutationRouter from '@/features/admin-stock-mutations/admin-stock-mutations.routes';
+import adminCategoryRouter from '@/features/admin-categories/admin-categories.routes';
+import adminStoreRouter from '@/features/admin-stores/admin-stores.routes';
 
 const app: Application = express();
 
@@ -126,6 +129,9 @@ app.use(`${API_PREFIX}/payments`, paymentRouter);
 
 app.use(`${API_PREFIX}/admin/products`, adminProductRouter);
 app.use(`${API_PREFIX}/admin/inventories`, adminInventoryRouter);
+app.use(`${API_PREFIX}/admin/stock-mutations`, adminStockMutationRouter);
+app.use(`${API_PREFIX}/admin/categories`, adminCategoryRouter);
+app.use(`${API_PREFIX}/admin/stores`, adminStoreRouter);
 
 app.use(API_PREFIX, catalogRouter);
 

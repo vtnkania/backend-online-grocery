@@ -27,6 +27,11 @@ model User {
   addresses       Address[]
   carts           Cart[]
   orders          Order[]
+  requestedMutations StockMutation[] @relation("RequestedMutations")
+  acceptedMutations  StockMutation[] @relation("AcceptedMutations")
+  rejectedMutations  StockMutation[] @relation("RejectedMutations")
+  shippedMutations   StockMutation[] @relation("ShippedMutations")
+  receivedMutations  StockMutation[] @relation("ReceivedMutations")
   socialAccounts  SocialAccount[]
   storeAdmins     StoreAdmin[]
   referrer        User?               @relation("Referral", fields: [referredBy], references: [id])
@@ -75,6 +80,7 @@ model Store {
   address     String
   latitude    Float
   longitude   Float
+  type        StoreType    @default(CABANG)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
@@ -140,7 +146,8 @@ model Inventory {
   updatedAt DateTime        @updatedAt
   product   Product         @relation(fields: [productId], references: [id])
   store     Store           @relation(fields: [storeId], references: [id])
-  mutations StockMutation[]
+  sourceMutations      StockMutation[] @relation("SourceInventory")
+  destinationMutations StockMutation[] @relation("DestinationInventory")
 
   @@unique([storeId, productId])
 }
@@ -148,13 +155,30 @@ model Inventory {
 model StockMutation {
   id            String       @id @default(uuid())
   inventoryId   String
+  destinationInventoryId String?
   type          MutationType
   quantity      Int
+  status        StockMutationStatus @default(REQUESTED)
   referenceType String?
   referenceId   String?
   notes         String?
+  requestedById String?
+  acceptedById  String?
+  rejectedById  String?
+  shippedById   String?
+  receivedById  String?
+  acceptedAt    DateTime?
+  rejectedAt    DateTime?
+  shippedAt     DateTime?
+  receivedAt    DateTime?
   createdAt     DateTime     @default(now())
-  inventory     Inventory    @relation(fields: [inventoryId], references: [id])
+  inventory     Inventory    @relation("SourceInventory", fields: [inventoryId], references: [id])
+  destinationInventory Inventory? @relation("DestinationInventory", fields: [destinationInventoryId], references: [id])
+  requestedBy   User?        @relation("RequestedMutations", fields: [requestedById], references: [id])
+  acceptedBy    User?        @relation("AcceptedMutations", fields: [acceptedById], references: [id])
+  rejectedBy    User?        @relation("RejectedMutations", fields: [rejectedById], references: [id])
+  shippedBy     User?        @relation("ShippedMutations", fields: [shippedById], references: [id])
+  receivedBy    User?        @relation("ReceivedMutations", fields: [receivedById], references: [id])
 }
 
 model Cart {
@@ -300,6 +324,19 @@ enum MutationType {
   IN
   OUT
   TRANSFER
+}
+
+enum StoreType {
+  UTAMA
+  CABANG
+}
+
+enum StockMutationStatus {
+  REQUESTED
+  REJECTED
+  ACCEPTED
+  SHIPPED
+  RECEIVED
 }
 
 enum VoucherType {
