@@ -12,6 +12,14 @@ export const assertAdminUser = (user?: UserPayload) => {
   return user;
 };
 
+export const assertSuperAdmin = (user?: UserPayload) => {
+  if (!user) throw new ResponseError(StatusCodes.UNAUTHORIZED, 'Authentication required.');
+  if (user.role !== 'SUPER_ADMIN') {
+    throw new ResponseError(StatusCodes.FORBIDDEN, 'Super admin access required.');
+  }
+  return user;
+};
+
 export const getAssignedStoreIds = async (userId: string) => {
   const stores = await prisma.storeAdmin.findMany({
     where: { userId, deletedAt: null, store: { deletedAt: null } },
@@ -32,4 +40,12 @@ export const resolveReadableStores = async (user: UserPayload, storeId?: string)
 export const resolveWritableStore = async (user: UserPayload, storeId: string) => {
   if (user.role === 'SUPER_ADMIN') return storeId;
   throw new ResponseError(StatusCodes.FORBIDDEN, 'Store admin access is read-only.');
+};
+
+export const assertStoreAccess = async (user: UserPayload, storeId: string) => {
+  if (user.role === 'SUPER_ADMIN') return;
+  const assignedIds = await getAssignedStoreIds(user.id);
+  if (!assignedIds.includes(storeId)) {
+    throw new ResponseError(StatusCodes.FORBIDDEN, 'Store is outside your access.');
+  }
 };

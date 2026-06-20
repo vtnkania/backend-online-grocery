@@ -23,7 +23,7 @@ export const getProduct = run(async (req, res) => {
 
 export const createProduct = run(async (req, res) => {
   const input = Validation.validate(productBodySchema, req.body);
-  const data = await service.createProduct(input, files(req));
+  const data = await service.createProduct(req.user, input, files(req));
   res.status(StatusCodes.CREATED).json({ data });
 });
 
@@ -40,7 +40,7 @@ export const deleteProduct = run(async (req, res) => {
   res.status(StatusCodes.OK).json(result);
 });
 
-export const getProductOptions = run(async (_req, res) => {
-  const data = await service.getProductOptions();
+export const getProductOptions = run(async (req, res) => {
+  const data = await service.getProductOptions(req.user);
   res.status(StatusCodes.OK).json({ data });
 });
